@@ -1,0 +1,20 @@
+# Ignore everything by default
+*
+
+# Only allow what the Dockerfile actually needs
+!config/
+
+# Secrets & credentials 
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+*.secret
+
+# OS & editor junk
+.DS_Store
+Thumbs.db
+.vscode/
+.cursor/
+.idea/
