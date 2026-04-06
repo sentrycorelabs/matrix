@@ -18,12 +18,25 @@ build_run_args() {
     local ports="$1"
     local container_name="$2"
 
+    # Project name for named volumes
+    local project_name
+    project_name=$(basename "$(pwd)")
+
     run_args=(
         --rm -it
         -v "$(pwd)":/app
         -v /var/run/docker.sock:/var/run/docker.sock
         --name "$container_name"
     )
+
+    # Isolate platform-specific dependency directories
+    # This prevents macOS-installed binaries from conflicting with Linux
+    if [[ -f "$(pwd)/package.json" ]]; then
+        run_args+=(-v "matrix-${project_name}-node_modules:/app/node_modules")
+    fi
+    if [[ -f "$(pwd)/composer.json" ]]; then
+        run_args+=(-v "matrix-${project_name}-vendor:/app/vendor")
+    fi
 
     # Map each port
     IFS=',' read -ra port_list <<< "$ports"
