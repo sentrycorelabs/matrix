@@ -53,7 +53,7 @@ Commands:
   help         Show usage info
 
 Options:
-  -p PORTS     Expose ports, comma-separated (default: 5173)
+  -p PORTS     Expose ports, comma-separated (default: random)
   -n NAME      Custom container name
 ```
 
@@ -100,7 +100,7 @@ The first time you run `matrix` in a directory, it runs an interactive setup:
 
   Map ~/.ssh into container? [Y/n]
   Pass Claude Code auth into container? [Y/n]
-  Ports to expose (comma-separated) [5173]:
+  Ports to expose (comma-separated) [random]:
   Add .matrix to .gitignore? [Y/n]
 
 [matrix] Saved to .matrix/settings.json
@@ -117,7 +117,7 @@ Running `matrix` in any project directory:
 3. Forwards the host Docker socket so you can run Docker commands inside the container
 4. Optionally mounts `~/.ssh` (read-only) for git operations
 5. Optionally passes Claude Code credentials through (macOS Keychain)
-6. Exposes ports for dev servers (default `5173`, supports multiple comma-separated ports)
+6. Exposes ports for dev servers (default: random ephemeral port, supports multiple comma-separated ports)
 7. Names the container after your project directory — re-running reconnects to it instead of creating a new one
 
 ## Project Structure

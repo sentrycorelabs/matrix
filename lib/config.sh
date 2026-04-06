@@ -2,12 +2,16 @@
 
 # ─── Settings ────────────────────────────────────────────────────
 
+random_port() {
+    echo $(( RANDOM % 16384 + 49152 ))
+}
+
 load_settings() {
     local settings_file=".matrix/settings.json"
     if [[ -f "$settings_file" ]]; then
         MATRIX_SSH=$(jq -r '.ssh // true' "$settings_file")
         MATRIX_CLAUDE_AUTH=$(jq -r '.claude_auth // true' "$settings_file")
-        MATRIX_PORTS=$(jq -r '.ports // "5173"' "$settings_file")
+        MATRIX_PORTS=$(jq -r '.ports // empty' "$settings_file" 2>/dev/null || echo "$(random_port)")
         return 0
     fi
     return 1
@@ -42,10 +46,12 @@ run_setup() {
         *)     MATRIX_CLAUDE_AUTH=true ;;
     esac
 
-    printf "  Ports to expose (comma-separated) [5173]: "
+    local default_port
+    default_port=$(random_port)
+    printf "  Ports to expose (comma-separated) [%s]: " "$default_port"
     read -r ans
     if [[ -z "$ans" ]]; then
-        MATRIX_PORTS="5173"
+        MATRIX_PORTS="$default_port"
     else
         local valid=true
         IFS=',' read -ra port_list <<< "$ans"
@@ -59,8 +65,8 @@ run_setup() {
         if [[ "$valid" == "true" ]]; then
             MATRIX_PORTS="$ans"
         else
-            msg "$YELLOW" "Invalid port(s), using default 5173"
-            MATRIX_PORTS="5173"
+            msg "$YELLOW" "Invalid port(s), using random port $default_port"
+            MATRIX_PORTS="$default_port"
         fi
     fi
 
