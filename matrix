@@ -2,6 +2,7 @@
 
 IMAGE_NAME="matrix"
 CONTAINER_PREFIX="matrix"
+MATRIX_HOME="$HOME/.matrix"
 
 # Colors
 RED='\033[0;31m'
@@ -28,6 +29,7 @@ usage() {
     echo "  list         List running Matrix containers"
     echo "  destroy      Remove the Matrix image"
     echo "  config       Re-run setup for the current directory"
+    echo "  update       Pull latest and rebuild the image"
     echo ""
     echo "Options:"
     echo "  -p PORT      Expose a port (default: 5173)"
@@ -161,7 +163,13 @@ cmd_enter() {
 
 cmd_build() {
     msg "$YELLOW" "Building the Matrix..."
-    docker build -t "$IMAGE_NAME" "$(dirname $0)"
+    docker build -t "$IMAGE_NAME" "$MATRIX_HOME"
+}
+
+cmd_update() {
+    msg "$CYAN" "Updating the Matrix..."
+    git -C "$MATRIX_HOME" pull || { msg "$RED" "Failed to pull latest changes."; return 1; }
+    cmd_build
 }
 
 cmd_stop() {
@@ -188,6 +196,7 @@ case "${1:-}" in
     list)    cmd_list ;;
     destroy) cmd_destroy ;;
     config)  run_setup ;;
+    update)  cmd_update ;;
     help|-h) usage ;;
     *)       cmd_enter "$@" ;;
 esac
