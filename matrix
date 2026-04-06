@@ -1,23 +1,22 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
 IMAGE_NAME="matrix"
 CONTAINER_PREFIX="matrix"
 MATRIX_HOME="$HOME/.matrix"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+# ─── Source libraries ────────────────────────────────────────────
 
-msg() {
-    local color="$1"
-    shift
-    printf "${color}${BOLD}[matrix]${NC} %s\n" "$*"
-}
+source "$MATRIX_HOME/lib/utils.sh"
+source "$MATRIX_HOME/lib/config.sh"
+source "$MATRIX_HOME/lib/docker.sh"
+
+# ─── Source commands ─────────────────────────────────────────────
+
+for cmd_file in "$MATRIX_HOME/commands/"*.sh; do
+    source "$cmd_file"
+done
+
+# ─── Usage ───────────────────────────────────────────────────────
 
 usage() {
     echo "Usage: matrix [command] [options]"
@@ -36,159 +35,7 @@ usage() {
     echo "  -n NAME      Custom container name"
 }
 
-get_container_name() {
-    echo "${CONTAINER_PREFIX}-${1:-$(basename $(pwd))}"
-}
-
-# ─── Settings ────────────────────────────────────────────────────
-
-load_settings() {
-    local settings_file=".matrix/settings.json"
-    if [[ -f "$settings_file" ]]; then
-        MATRIX_SSH=$(jq -r '.ssh // true' "$settings_file")
-        MATRIX_CLAUDE_AUTH=$(jq -r '.claude_auth // true' "$settings_file")
-        MATRIX_PORT=$(jq -r '.port // 5173' "$settings_file")
-        return 0
-    fi
-    return 1
-}
-
-save_settings() {
-    mkdir -p .matrix
-    cat > .matrix/settings.json <<SETTINGS
-{
-  "ssh": ${MATRIX_SSH},
-  "claude_auth": ${MATRIX_CLAUDE_AUTH},
-  "port": ${MATRIX_PORT}
-}
-SETTINGS
-}
-
-run_setup() {
-    msg "$CYAN" "First-time setup for this project"
-    echo ""
-
-    printf "  Map ~/.ssh into container? [Y/n] "
-    read -r ans
-    case "$ans" in
-        [nN]*) MATRIX_SSH=false ;;
-        *)     MATRIX_SSH=true ;;
-    esac
-
-    printf "  Pass Claude Code auth into container? [Y/n] "
-    read -r ans
-    case "$ans" in
-        [nN]*) MATRIX_CLAUDE_AUTH=false ;;
-        *)     MATRIX_CLAUDE_AUTH=true ;;
-    esac
-
-    printf "  Default port [5173]: "
-    read -r ans
-    MATRIX_PORT=${ans:-5173}
-
-    if [[ -f .gitignore ]] && ! grep -qx '.matrix' .gitignore && ! grep -qx '.matrix/' .gitignore; then
-        printf "  Add .matrix to .gitignore? [Y/n] "
-        read -r ans
-        case "$ans" in
-            [nN]*) ;;
-            *)
-                echo "" >> .gitignore
-                echo ".matrix" >> .gitignore
-                msg "$GREEN" "Added .matrix to .gitignore"
-                ;;
-        esac
-    fi
-
-    echo ""
-    save_settings
-    msg "$GREEN" "Saved to .matrix/settings.json"
-}
-
-# ─── Commands ────────────────────────────────────────────────────
-
-cmd_enter() {
-    local name=""
-    local port_override=""
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -p) port_override="$2"; shift 2 ;;
-            -n) name="$2"; shift 2 ;;
-            *)  shift ;;
-        esac
-    done
-
-    if ! load_settings; then
-        run_setup
-    fi
-
-    local port="${port_override:-$MATRIX_PORT}"
-    local container_name=$(get_container_name "$name")
-
-    if docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
-        msg "$GREEN" "Reconnecting to ${container_name}..."
-        docker exec -it "$container_name" /usr/bin/zsh
-        return
-    fi
-
-    local -a run_args=(
-        --rm -it
-        -v "$(pwd)":/app
-        -v /var/run/docker.sock:/var/run/docker.sock
-        -p "$port:$port"
-        --name "$container_name"
-    )
-
-    if [[ "$MATRIX_SSH" == "true" ]]; then
-        run_args+=(-v "$HOME/.ssh:/root/.ssh:ro")
-    fi
-
-    if [[ "$MATRIX_CLAUDE_AUTH" == "true" ]]; then
-        local oauth_token=""
-        local creds_json
-        creds_json=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || echo "")
-        if [[ -n "$creds_json" ]]; then
-            oauth_token=$(echo "$creds_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['claudeAiOauth']['accessToken'])" 2>/dev/null || echo "")
-        fi
-        run_args+=(
-            -v "$HOME/.claude:/root/.claude"
-            -v "$HOME/.claude.json:/root/.claude.json"
-            -e "CLAUDE_CODE_OAUTH_TOKEN=${oauth_token:-}"
-        )
-    fi
-
-    msg "$GREEN" "Entering the Matrix..."
-    docker run "${run_args[@]}" "$IMAGE_NAME"
-}
-
-cmd_build() {
-    msg "$YELLOW" "Building the Matrix..."
-    docker build -t "$IMAGE_NAME" "$MATRIX_HOME"
-}
-
-cmd_update() {
-    msg "$CYAN" "Updating the Matrix..."
-    git -C "$MATRIX_HOME" pull || { msg "$RED" "Failed to pull latest changes."; return 1; }
-    cmd_build
-}
-
-cmd_stop() {
-    local container_name=$(get_container_name "$1")
-    msg "$RED" "Exiting the Matrix: ${container_name}..."
-    docker stop "$container_name" 2>/dev/null || echo "Container not running."
-}
-
-cmd_list() {
-    msg "$BLUE" "Active Matrix containers:"
-    docker ps --filter "name=${CONTAINER_PREFIX}-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-}
-
-cmd_destroy() {
-    msg "$RED" "Destroying the Matrix image..."
-    docker rmi "$IMAGE_NAME" 2>/dev/null || echo "Image not found."
-}
-
-# ─── Entrypoint ──────────────────────────────────────────────────
+# ─── Dispatch ────────────────────────────────────────────────────
 
 case "${1:-}" in
     build)   cmd_build ;;
