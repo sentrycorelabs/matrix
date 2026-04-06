@@ -53,7 +53,7 @@ Commands:
   help         Show usage info
 
 Options:
-  -p PORT      Expose a port (default: 5173)
+  -p PORTS     Expose ports, comma-separated (default: 5173)
   -n NAME      Custom container name
 ```
 
@@ -65,6 +65,9 @@ matrix
 
 # Enter with a custom port
 matrix -p 3000
+
+# Enter with multiple ports
+matrix -p 3000,5173,8080
 
 # Enter with a custom container name
 matrix -n api-project
@@ -97,7 +100,7 @@ The first time you run `matrix` in a directory, it runs an interactive setup:
 
   Map ~/.ssh into container? [Y/n]
   Pass Claude Code auth into container? [Y/n]
-  Default port [5173]:
+  Ports to expose (comma-separated) [5173]:
   Add .matrix to .gitignore? [Y/n]
 
 [matrix] Saved to .matrix/settings.json
@@ -114,16 +117,27 @@ Running `matrix` in any project directory:
 3. Forwards the host Docker socket so you can run Docker commands inside the container
 4. Optionally mounts `~/.ssh` (read-only) for git operations
 5. Optionally passes Claude Code credentials through (macOS Keychain)
-6. Exposes a port for dev servers (default `5173`)
+6. Exposes ports for dev servers (default `5173`, supports multiple comma-separated ports)
 7. Names the container after your project directory — re-running reconnects to it instead of creating a new one
 
 ## Project Structure
 
 ```
 ~/.matrix/
-├── Dockerfile          # Image definition
-├── matrix              # CLI entrypoint
+├── matrix              # CLI entrypoint (thin dispatcher)
 ├── install.sh          # Curl installer
+├── Dockerfile          # Image definition
+├── lib/
+│   ├── utils.sh        # Colors, messaging, helpers
+│   ├── config.sh       # Settings load/save/setup
+│   └── docker.sh       # Docker socket, auth, run args
+├── commands/
+│   ├── enter.sh        # Enter/reconnect to container
+│   ├── build.sh        # Build the image
+│   ├── stop.sh         # Stop a container
+│   ├── list.sh         # List active containers
+│   ├── destroy.sh      # Remove the image
+│   └── update.sh       # Pull latest and rebuild
 ├── config/
 │   ├── zshrc           # Zsh configuration
 │   ├── p10k.zsh        # Powerlevel10k theme
