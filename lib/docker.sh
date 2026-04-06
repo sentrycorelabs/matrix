@@ -15,16 +15,22 @@ get_claude_token() {
 # ─── Run Args Builder ────────────────────────────────────────────
 
 build_run_args() {
-    local port="$1"
+    local ports="$1"
     local container_name="$2"
 
     run_args=(
         --rm -it
         -v "$(pwd)":/app
         -v /var/run/docker.sock:/var/run/docker.sock
-        -p "$port:$port"
         --name "$container_name"
     )
+
+    # Map each port
+    IFS=',' read -ra port_list <<< "$ports"
+    for p in "${port_list[@]}"; do
+        p=$(echo "$p" | tr -d ' ')
+        run_args+=(-p "$p:$p")
+    done
 
     # SSH
     if [[ "$MATRIX_SSH" == "true" ]]; then

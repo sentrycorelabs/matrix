@@ -31,7 +31,7 @@ usage() {
     echo "  update       Pull latest and rebuild the image"
     echo ""
     echo "Options:"
-    echo "  -p PORT      Expose a port (default: 5173)"
+    echo "  -p PORTS     Expose ports, comma-separated (default: 5173)"
     echo "  -n NAME      Custom container name"
 }
 

@@ -7,7 +7,7 @@ load_settings() {
     if [[ -f "$settings_file" ]]; then
         MATRIX_SSH=$(jq -r '.ssh // true' "$settings_file")
         MATRIX_CLAUDE_AUTH=$(jq -r '.claude_auth // true' "$settings_file")
-        MATRIX_PORT=$(jq -r '.port // 5173' "$settings_file")
+        MATRIX_PORTS=$(jq -r '.ports // "5173"' "$settings_file")
         return 0
     fi
     return 1
@@ -19,7 +19,7 @@ save_settings() {
 {
   "ssh": ${MATRIX_SSH},
   "claude_auth": ${MATRIX_CLAUDE_AUTH},
-  "port": ${MATRIX_PORT}
+  "ports": "${MATRIX_PORTS}"
 }
 SETTINGS
 }
@@ -42,9 +42,27 @@ run_setup() {
         *)     MATRIX_CLAUDE_AUTH=true ;;
     esac
 
-    printf "  Default port [5173]: "
+    printf "  Ports to expose (comma-separated) [5173]: "
     read -r ans
-    MATRIX_PORT=${ans:-5173}
+    if [[ -z "$ans" ]]; then
+        MATRIX_PORTS="5173"
+    else
+        local valid=true
+        IFS=',' read -ra port_list <<< "$ans"
+        for p in "${port_list[@]}"; do
+            p=$(echo "$p" | tr -d ' ')
+            if ! [[ "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
+                valid=false
+                break
+            fi
+        done
+        if [[ "$valid" == "true" ]]; then
+            MATRIX_PORTS="$ans"
+        else
+            msg "$YELLOW" "Invalid port(s), using default 5173"
+            MATRIX_PORTS="5173"
+        fi
+    fi
 
     if [[ -f .gitignore ]] && ! grep -qx '.matrix' .gitignore && ! grep -qx '.matrix/' .gitignore; then
         printf "  Add .matrix to .gitignore? [Y/n] "
