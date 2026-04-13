@@ -70,8 +70,9 @@ RUN add-apt-repository ppa:ondrej/php -y \
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# ─── Claude Code ──────────────────────────────────────────────────
-RUN npm install -g @anthropic-ai/claude-code
+# ─── Claude Code (native installer) ─────────────────────────────
+RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="$PATH:/root/.local/bin"
 
 # ─── Set zsh as default shell ─────────────────────────────────────
 RUN chsh -s /usr/bin/zsh root
