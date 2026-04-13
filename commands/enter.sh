@@ -36,17 +36,16 @@ cmd_enter() {
     local container_name
     container_name=$(get_container_name "$name")
 
-    # Reconnect to existing container
-    if docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+    # Start new container if not already running
+    if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+        local -a run_args
+        build_run_args "$ports" "$container_name"
+
+        msg "$GREEN" "Entering the Matrix..."
+        docker run "${run_args[@]}" "$IMAGE_NAME" > /dev/null
+    else
         msg "$GREEN" "Reconnecting to ${container_name}..."
-        docker exec -it "$container_name" /usr/bin/zsh
-        return
     fi
 
-    # Build docker run arguments
-    local -a run_args
-    build_run_args "$ports" "$container_name"
-
-    msg "$GREEN" "Entering the Matrix..."
-    docker run "${run_args[@]}" "$IMAGE_NAME"
+    docker exec -it "$container_name" /usr/bin/zsh
 }

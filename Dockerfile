@@ -108,4 +108,4 @@ RUN nvim --headless "+Lazy! sync" +qa 2>/dev/null || true
 # ─── Workspace ────────────────────────────────────────────────────
 WORKDIR /app
 
-ENTRYPOINT ["/usr/bin/zsh"]
+ENTRYPOINT ["sleep", "infinity"]

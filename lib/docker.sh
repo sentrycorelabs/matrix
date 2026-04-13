@@ -23,7 +23,7 @@ build_run_args() {
     project_name=$(basename "$(pwd)")
 
     run_args=(
-        --rm -it
+        -d
         -v "$(pwd)":/app
         -v /var/run/docker.sock:/var/run/docker.sock
         --name "$container_name"
