@@ -18,8 +18,30 @@ msg() {
     printf "${color}${BOLD}[matrix]${NC} %s\n" "$*"
 }
 
+# ─── Platform Detection ─────────────────────────────────────────
+
+get_platform() {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "macos"
+    elif grep -qi microsoft /proc/version 2>/dev/null; then
+        echo "wsl"
+    else
+        echo "linux"
+    fi
+}
+
+MATRIX_PLATFORM="$(get_platform)"
+
 # ─── Helpers ─────────────────────────────────────────────────────
 
 get_container_name() {
     echo "${CONTAINER_PREFIX}-${1:-$(basename "$(pwd)")}"
+}
+
+get_windows_home() {
+    local win_user
+    win_user=$(cmd.exe /C "echo %USERPROFILE%" 2>/dev/null | tr -d '\r')
+    if [[ -n "$win_user" ]]; then
+        wslpath "$win_user"
+    fi
 }
