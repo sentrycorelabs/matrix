@@ -38,6 +38,9 @@ cmd_enter() {
 
     # Start new container if not already running
     if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+        # Remove stopped container with same name if it exists
+        docker rm "$container_name" 2>/dev/null
+
         local -a run_args
         build_run_args "$ports" "$container_name"
 
