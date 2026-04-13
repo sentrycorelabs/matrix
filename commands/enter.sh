@@ -47,5 +47,7 @@ cmd_enter() {
         msg "$GREEN" "Reconnecting to ${container_name}..."
     fi
 
-    docker exec -it "$container_name" /usr/bin/zsh
+    # Attach to shared tmux session (create if first connection)
+    docker exec -it "$container_name" /usr/bin/zsh -c \
+        'tmux has-session -t matrix 2>/dev/null && tmux attach -t matrix || tmux new-session -s matrix'
 }
