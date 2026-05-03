@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "[matrix] Python 3 is not available in this container."
+echo "         Add it with: matrix config"
+exit 127

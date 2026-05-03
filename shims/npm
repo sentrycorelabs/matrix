@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "[matrix] npm is not available in this container (requires Node.js)."
+echo "         Add it with: matrix config"
+exit 127

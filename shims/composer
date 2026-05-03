@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "[matrix] Composer is not available in this container (requires PHP)."
+echo "         Add it with: matrix config"
+exit 127
