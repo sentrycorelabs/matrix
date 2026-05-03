@@ -7,16 +7,7 @@ cmd_enter() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             -p)
-                local valid=true
-                IFS=',' read -ra _ports <<< "$2"
-                for p in "${_ports[@]}"; do
-                    p=$(echo "$p" | tr -d ' ')
-                    if ! [[ "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
-                        valid=false
-                        break
-                    fi
-                done
-                if [[ "$valid" == "true" ]]; then
+                if validate_ports "$2"; then
                     ports_override="$2"
                 else
                     msg "$RED" "Invalid port(s): $2"
@@ -32,9 +23,23 @@ cmd_enter() {
         run_setup
     fi
 
+    # Show font notice once
+    if [[ ! -f "$MATRIX_HOME/font_notice_shown" ]]; then
+        echo ""
+        msg "$CYAN" "Powerlevel10k works best with a Nerd Font."
+        msg "$CYAN" "If icons look broken, install one from: https://www.nerdfonts.com"
+        msg "$CYAN" "Any Nerd Font works (Meslo, Fira Code, JetBrains Mono, etc.)"
+        echo ""
+        touch "$MATRIX_HOME/font_notice_shown"
+    fi
+
     local ports="${ports_override:-$MATRIX_PORTS}"
     local container_name
     container_name=$(get_container_name "$name")
+
+    # Resolve and ensure the image exists
+    local image_name
+    image_name=$(ensure_image "$MATRIX_RUNTIMES")
 
     # Start new container if not already running
     if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
@@ -42,10 +47,10 @@ cmd_enter() {
         docker rm "$container_name" 2>/dev/null
 
         local -a run_args
-        build_run_args "$ports" "$container_name"
+        build_run_args "$ports" "$container_name" "$image_name"
 
         msg "$GREEN" "Entering the Matrix..."
-        docker run "${run_args[@]}" "$IMAGE_NAME" > /dev/null
+        docker run "${run_args[@]}" "$image_name" > /dev/null
     else
         msg "$GREEN" "Reconnecting to ${container_name}..."
     fi
