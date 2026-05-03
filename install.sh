@@ -24,6 +24,12 @@ fail() {
     exit 1
 }
 
+# ─── Platform check ─────────────────────────────────────────────
+
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    fail "Windows/WSL is not supported yet. macOS and Linux only."
+fi
+
 # ─── Preflight checks ───────────────────────────────────────────
 
 command -v git >/dev/null 2>&1 || fail "git is required but not installed."
@@ -58,13 +64,12 @@ fi
 
 msg "$GREEN" "Symlinked matrix to $BIN_LINK"
 
-# ─── Build ───────────────────────────────────────────────────────
-
-msg "$CYAN" "Building the Docker image (this may take a few minutes)..."
-docker build -t matrix "$INSTALL_DIR"
+# ─── Done ────────────────────────────────────────────────────────
 
 msg "$GREEN" "Matrix installed successfully!"
 echo ""
 echo "  Run 'matrix' in any project directory to get started."
 echo "  Run 'matrix help' for all commands."
+echo ""
+echo "  Images are pulled automatically on first run — no build needed."
 echo ""
