@@ -31,7 +31,11 @@ ensure_image() {
     if [[ -z "$runtimes_str" ]]; then
         if ! docker image inspect "$image_name" &>/dev/null; then
             msg "$CYAN" "Pulling base image..."
-            docker pull "$image_name"
+            if ! docker pull "$image_name" >&2; then
+                msg "$RED" "Failed to pull base image: $image_name"
+                msg "$RED" "The image may not be published yet. Check https://github.com/sentrycorelabs/matrix"
+                return 1
+            fi
         fi
         echo "$image_name"
         return
@@ -41,6 +45,16 @@ ensure_image() {
     if docker image inspect "$image_name" &>/dev/null; then
         echo "$image_name"
         return
+    fi
+
+    # Ensure base image is available
+    if ! docker image inspect "${MATRIX_REGISTRY}:base" &>/dev/null; then
+        msg "$CYAN" "Pulling base image..."
+        if ! docker pull "${MATRIX_REGISTRY}:base" >&2; then
+            msg "$RED" "Failed to pull base image: ${MATRIX_REGISTRY}:base"
+            msg "$RED" "The image may not be published yet. Check https://github.com/sentrycorelabs/matrix"
+            return 1
+        fi
     fi
 
     # Generate Dockerfile in memory
@@ -53,7 +67,11 @@ COPY --from=${MATRIX_REGISTRY}:runtime-${rt} / /"
     done
 
     # Build from stdin — no build context needed
-    echo "$dockerfile" | docker build -t "$image_name" -f - . > /dev/null
+    if ! echo "$dockerfile" | docker build -t "$image_name" -f - . >&2; then
+        msg "$RED" "Failed to build project image."
+        msg "$RED" "A runtime image may not be published yet. Run: matrix update"
+        return 1
+    fi
 
     echo "$image_name"
 }

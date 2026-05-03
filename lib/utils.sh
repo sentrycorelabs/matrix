@@ -15,7 +15,7 @@ NC='\033[0m'
 msg() {
     local color="$1"
     shift
-    printf "${color}${BOLD}[matrix]${NC} %s\n" "$*"
+    printf "${color}${BOLD}[matrix]${NC} %s\n" "$*" >&2
 }
 
 # ─── Platform Detection ─────────────────────────────────────────

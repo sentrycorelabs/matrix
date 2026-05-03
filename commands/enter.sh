@@ -25,11 +25,9 @@ cmd_enter() {
 
     # Show font notice once
     if [[ ! -f "$MATRIX_HOME/font_notice_shown" ]]; then
-        echo ""
         msg "$CYAN" "Powerlevel10k works best with a Nerd Font."
         msg "$CYAN" "If icons look broken, install one from: https://www.nerdfonts.com"
         msg "$CYAN" "Any Nerd Font works (Meslo, Fira Code, JetBrains Mono, etc.)"
-        echo ""
         touch "$MATRIX_HOME/font_notice_shown"
     fi
 
@@ -39,12 +37,14 @@ cmd_enter() {
 
     # Resolve and ensure the image exists
     local image_name
-    image_name=$(ensure_image "$MATRIX_RUNTIMES")
+    if ! image_name=$(ensure_image "$MATRIX_RUNTIMES"); then
+        return 1
+    fi
 
     # Start new container if not already running
     if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
         # Remove stopped container with same name if it exists
-        docker rm "$container_name" 2>/dev/null
+        docker rm "$container_name" &>/dev/null
 
         local -a run_args
         build_run_args "$ports" "$container_name" "$image_name"

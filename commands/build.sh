@@ -15,6 +15,8 @@ cmd_build() {
     fi
 
     msg "$YELLOW" "Rebuilding project image..."
-    ensure_image "$MATRIX_RUNTIMES" > /dev/null
+    if ! ensure_image "$MATRIX_RUNTIMES" > /dev/null; then
+        return 1
+    fi
     msg "$GREEN" "Done."
 }
