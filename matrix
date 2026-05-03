@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-IMAGE_NAME="matrix"
 CONTAINER_PREFIX="matrix"
 MATRIX_HOME="$HOME/.matrix"
 
@@ -8,6 +7,8 @@ MATRIX_HOME="$HOME/.matrix"
 
 source "$MATRIX_HOME/lib/utils.sh"
 source "$MATRIX_HOME/lib/config.sh"
+source "$MATRIX_HOME/lib/detect.sh"
+source "$MATRIX_HOME/lib/build.sh"
 source "$MATRIX_HOME/lib/docker.sh"
 
 # ─── Source commands ─────────────────────────────────────────────
@@ -23,12 +24,12 @@ usage() {
     echo ""
     echo "Commands:"
     echo "  (none)       Enter the Matrix in the current directory"
-    echo "  build        Build/rebuild the Matrix image"
+    echo "  build        Build/rebuild the project image"
     echo "  stop [name]  Stop a running container (default: current dir)"
     echo "  list         List running Matrix containers"
-    echo "  destroy      Remove the Matrix image"
+    echo "  destroy      Remove all Matrix images"
     echo "  config       Re-run setup for the current directory"
-    echo "  update       Pull latest and rebuild the image"
+    echo "  update       Pull latest images and CLI"
     echo ""
     echo "Options:"
     echo "  -p PORTS     Expose ports, comma-separated (default: random)"
