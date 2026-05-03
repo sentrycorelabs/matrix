@@ -10,21 +10,7 @@ get_claude_token() {
         macos)
             creds_json=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || echo "")
             ;;
-        wsl)
-            creds_json=$(powershell.exe -NoProfile -Command \
-                "[System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-StoredCredential -Target 'Claude Code-credentials' -AsCredentialObject).Password))" 2>/dev/null \
-                | tr -d '\r' || echo "")
-            # Fallback: read from Windows-side Claude config
-            if [[ -z "$creds_json" ]]; then
-                local win_home
-                win_home=$(get_windows_home)
-                if [[ -f "$win_home/.claude/.credentials.json" ]]; then
-                    creds_json=$(cat "$win_home/.claude/.credentials.json" 2>/dev/null || echo "")
-                fi
-            fi
-            ;;
         linux)
-            # Native Linux: read from file-based credential store
             if [[ -f "$HOME/.claude/.credentials.json" ]]; then
                 creds_json=$(cat "$HOME/.claude/.credentials.json" 2>/dev/null || echo "")
             fi
@@ -32,7 +18,7 @@ get_claude_token() {
     esac
 
     if [[ -n "$creds_json" ]]; then
-        oauth_token=$(echo "$creds_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['claudeAiOauth']['accessToken'])" 2>/dev/null || echo "")
+        oauth_token=$(echo "$creds_json" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null || echo "")
     fi
     echo "$oauth_token"
 }
@@ -42,8 +28,8 @@ get_claude_token() {
 build_run_args() {
     local ports="$1"
     local container_name="$2"
+    local image_name="$3"
 
-    # Project name for named volumes
     local project_name
     project_name=$(basename "$(pwd)")
 
@@ -55,7 +41,6 @@ build_run_args() {
     )
 
     # Isolate platform-specific dependency directories
-    # This prevents macOS-installed binaries from conflicting with Linux
     if [[ -f "$(pwd)/package.json" ]]; then
         run_args+=(-v "matrix-${project_name}-node_modules:/app/node_modules")
     fi
@@ -72,17 +57,8 @@ build_run_args() {
 
     # SSH
     if [[ "$MATRIX_SSH" == "true" ]]; then
-        local ssh_dir="$HOME/.ssh"
-        # On WSL, prefer Windows SSH keys if WSL-native keys don't exist
-        if [[ "$MATRIX_PLATFORM" == "wsl" && ! -d "$ssh_dir" ]]; then
-            local win_home
-            win_home=$(get_windows_home)
-            if [[ -d "$win_home/.ssh" ]]; then
-                ssh_dir="$win_home/.ssh"
-            fi
-        fi
-        if [[ -d "$ssh_dir" ]]; then
-            run_args+=(-v "$ssh_dir:/root/.ssh:ro")
+        if [[ -d "$HOME/.ssh" ]]; then
+            run_args+=(-v "$HOME/.ssh:/root/.ssh:ro")
         fi
     fi
 
@@ -91,20 +67,14 @@ build_run_args() {
         local oauth_token
         oauth_token=$(get_claude_token)
 
-        local claude_dir="$HOME/.claude"
-        local claude_json="$HOME/.claude.json"
-        # On WSL, fall back to Windows-side Claude config
-        if [[ "$MATRIX_PLATFORM" == "wsl" && ! -d "$claude_dir" ]]; then
-            local win_home
-            win_home=$(get_windows_home)
-            [[ -d "$win_home/.claude" ]] && claude_dir="$win_home/.claude"
-            [[ -f "$win_home/.claude.json" ]] && claude_json="$win_home/.claude.json"
+        if [[ -d "$HOME/.claude" ]]; then
+            run_args+=(-v "$HOME/.claude:/root/.claude:ro")
         fi
-
-        run_args+=(
-            -v "$claude_dir:/root/.claude"
-            -v "$claude_json:/root/.claude.json"
-            -e "CLAUDE_CODE_OAUTH_TOKEN=${oauth_token:-}"
-        )
+        if [[ -f "$HOME/.claude.json" ]]; then
+            run_args+=(-v "$HOME/.claude.json:/root/.claude.json:ro")
+        fi
+        if [[ -n "$oauth_token" ]]; then
+            run_args+=(-e "CLAUDE_CODE_OAUTH_TOKEN=${oauth_token}")
+        fi
     fi
 }
