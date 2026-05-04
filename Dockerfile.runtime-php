@@ -9,8 +9,7 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://packages.sury.org/php/apt.gpg | gpg --dearmor -o /etc/apt/keyrings/ondrej-php.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://packages.sury.org/php/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" > /etc/apt/sources.list.d/ondrej-php.list \
+RUN add-apt-repository ppa:ondrej/php -y \
     && apt-get update \
     && apt-get install -y \
     php8.5-cli \
