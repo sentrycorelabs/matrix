@@ -2,6 +2,8 @@ FROM ubuntu:24.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 # ─── System packages ──────────────────────────────────────────────
 RUN apt-get update && apt-get install -y \
     zsh \
