@@ -6,12 +6,32 @@ random_port() {
     echo $(( RANDOM % 16384 + 49152 ))
 }
 
+validate_ports() {
+    local input="$1"
+    IFS=',' read -ra port_list <<< "$input"
+    for p in "${port_list[@]}"; do
+        p=$(echo "$p" | tr -d ' ')
+        if ! [[ "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
+            return 1
+        fi
+    done
+    return 0
+}
+
 load_settings() {
     local settings_file=".matrix/settings.json"
     if [[ -f "$settings_file" ]]; then
-        MATRIX_SSH=$(jq -r '.ssh // true' "$settings_file")
-        MATRIX_CLAUDE_AUTH=$(jq -r '.claude_auth // true' "$settings_file")
-        MATRIX_PORTS=$(jq -r '.ports // empty' "$settings_file" 2>/dev/null || echo "$(random_port)")
+        MATRIX_SSH=$(jq -r '.ssh // false' "$settings_file")
+        MATRIX_CLAUDE_AUTH=$(jq -r '.claude_auth // false' "$settings_file")
+        MATRIX_PORTS=$(jq -r '.ports // empty' "$settings_file" 2>/dev/null)
+        if [[ -z "$MATRIX_PORTS" ]]; then
+            # Backwards compat: old settings used "port" (singular)
+            MATRIX_PORTS=$(jq -r '.port // empty' "$settings_file" 2>/dev/null)
+        fi
+        if [[ -z "$MATRIX_PORTS" ]]; then
+            MATRIX_PORTS="$(random_port)"
+        fi
+        MATRIX_RUNTIMES=$(jq -r '(.runtimes // []) | join(" ")' "$settings_file" 2>/dev/null || echo "")
         return 0
     fi
     return 1
@@ -19,31 +39,58 @@ load_settings() {
 
 save_settings() {
     mkdir -p .matrix
-    cat > .matrix/settings.json <<SETTINGS
-{
-  "ssh": ${MATRIX_SSH},
-  "claude_auth": ${MATRIX_CLAUDE_AUTH},
-  "ports": "${MATRIX_PORTS}"
-}
-SETTINGS
+
+    # Build runtimes JSON array
+    local runtimes_json="[]"
+    if [[ -n "$MATRIX_RUNTIMES" ]]; then
+        runtimes_json=$(echo "$MATRIX_RUNTIMES" | tr ' ' '\n' | jq -R . | jq -s .)
+    fi
+
+    jq -n \
+        --argjson ssh "$MATRIX_SSH" \
+        --argjson claude_auth "$MATRIX_CLAUDE_AUTH" \
+        --arg ports "$MATRIX_PORTS" \
+        --argjson runtimes "$runtimes_json" \
+        '{ssh: $ssh, claude_auth: $claude_auth, ports: $ports, runtimes: $runtimes}' \
+        > .matrix/settings.json
 }
 
 run_setup() {
     msg "$CYAN" "First-time setup for this project"
     echo ""
 
-    printf "  Map ~/.ssh into container? [Y/n] "
+    # Auto-detect runtimes
+    local detected
+    detected=$(detect_runtimes)
+    if [[ -n "$detected" ]]; then
+        msg "$GREEN" "Detected runtimes: $detected"
+    else
+        msg "$YELLOW" "No runtimes detected (base environment only)"
+    fi
+    MATRIX_RUNTIMES="$detected"
+
+    printf "  Override detected runtimes? (available: ${AVAILABLE_RUNTIMES[*]}) [n]: "
     read -r ans
     case "$ans" in
-        [nN]*) MATRIX_SSH=false ;;
-        *)     MATRIX_SSH=true ;;
+        [yY]*)
+            printf "  Runtimes (space-separated, e.g. 'node python'): "
+            read -r custom_runtimes
+            MATRIX_RUNTIMES="$custom_runtimes"
+            ;;
     esac
 
-    printf "  Pass Claude Code auth into container? [Y/n] "
+    printf "  Map ~/.ssh into container? [y/N] "
     read -r ans
     case "$ans" in
-        [nN]*) MATRIX_CLAUDE_AUTH=false ;;
-        *)     MATRIX_CLAUDE_AUTH=true ;;
+        [yY]*) MATRIX_SSH=true ;;
+        *)     MATRIX_SSH=false ;;
+    esac
+
+    printf "  Pass Claude Code auth into container? [y/N] "
+    read -r ans
+    case "$ans" in
+        [yY]*) MATRIX_CLAUDE_AUTH=true ;;
+        *)     MATRIX_CLAUDE_AUTH=false ;;
     esac
 
     local default_port
@@ -53,16 +100,7 @@ run_setup() {
     if [[ -z "$ans" ]]; then
         MATRIX_PORTS="$default_port"
     else
-        local valid=true
-        IFS=',' read -ra port_list <<< "$ans"
-        for p in "${port_list[@]}"; do
-            p=$(echo "$p" | tr -d ' ')
-            if ! [[ "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
-                valid=false
-                break
-            fi
-        done
-        if [[ "$valid" == "true" ]]; then
+        if validate_ports "$ans"; then
             MATRIX_PORTS="$ans"
         else
             msg "$YELLOW" "Invalid port(s), using random port $default_port"
