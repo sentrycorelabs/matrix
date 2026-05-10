@@ -20,6 +20,53 @@ get_image_name() {
     echo "matrix-${sorted}"
 }
 
+# ─── Published Image Fallbacks ──────────────────────────────────
+
+ensure_base_image() {
+    local image_name="${MATRIX_REGISTRY}:base"
+
+    if docker image inspect "$image_name" &>/dev/null; then
+        return 0
+    fi
+
+    msg "$CYAN" "Pulling base image..."
+    if docker pull "$image_name" >&2; then
+        return 0
+    fi
+
+    msg "$YELLOW" "Base image pull failed; building locally from Dockerfile.base..."
+    if ! docker build -t "$image_name" -f "$MATRIX_HOME/Dockerfile.base" "$MATRIX_HOME" >&2; then
+        msg "$RED" "Failed to build base image locally."
+        return 1
+    fi
+}
+
+ensure_runtime_image() {
+    local runtime="$1"
+    local image_name="${MATRIX_REGISTRY}:runtime-${runtime}"
+    local dockerfile="${MATRIX_HOME}/Dockerfile.runtime-${runtime}"
+
+    if docker image inspect "$image_name" &>/dev/null; then
+        return 0
+    fi
+
+    msg "$CYAN" "Pulling ${runtime} runtime..."
+    if docker pull "$image_name" >&2; then
+        return 0
+    fi
+
+    if [[ ! -f "$dockerfile" ]]; then
+        msg "$RED" "No Dockerfile found for runtime: ${runtime}"
+        return 1
+    fi
+
+    msg "$YELLOW" "${runtime} runtime pull failed; building locally..."
+    if ! docker build -t "$image_name" -f "$dockerfile" "$MATRIX_HOME" >&2; then
+        msg "$RED" "Failed to build ${runtime} runtime locally."
+        return 1
+    fi
+}
+
 # ─── Local Image Build ──────────────────────────────────────────
 
 ensure_image() {
@@ -29,14 +76,7 @@ ensure_image() {
 
     # No runtimes — use base image directly (pull if needed)
     if [[ -z "$runtimes_str" ]]; then
-        if ! docker image inspect "$image_name" &>/dev/null; then
-            msg "$CYAN" "Pulling base image..."
-            if ! docker pull "$image_name" >&2; then
-                msg "$RED" "Failed to pull base image: $image_name"
-                msg "$RED" "The image may not be published yet. Check https://github.com/sentrycorelabs/matrix"
-                return 1
-            fi
-        fi
+        ensure_base_image || return 1
         echo "$image_name"
         return
     fi
@@ -47,15 +87,12 @@ ensure_image() {
         return
     fi
 
-    # Ensure base image is available
-    if ! docker image inspect "${MATRIX_REGISTRY}:base" &>/dev/null; then
-        msg "$CYAN" "Pulling base image..."
-        if ! docker pull "${MATRIX_REGISTRY}:base" >&2; then
-            msg "$RED" "Failed to pull base image: ${MATRIX_REGISTRY}:base"
-            msg "$RED" "The image may not be published yet. Check https://github.com/sentrycorelabs/matrix"
-            return 1
-        fi
-    fi
+    # Ensure base and runtime layers are available. Published images are used
+    # when accessible; otherwise the local Dockerfiles are the source of truth.
+    ensure_base_image || return 1
+    for rt in $runtimes_str; do
+        ensure_runtime_image "$rt" || return 1
+    done
 
     # Generate Dockerfile in memory
     msg "$CYAN" "Building project image (${image_name})..."

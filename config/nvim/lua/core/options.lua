@@ -43,7 +43,6 @@ opt.termguicolors = true
 opt.background = "dark"
 opt.signcolumn = "yes"
 opt.fillchars:append({ eob = " " }) -- Remove ~ from end of buffer
-vim.cmd("colorscheme nightfly")
 
 -- Window title
 opt.title = true

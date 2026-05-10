@@ -7,12 +7,10 @@ cmd_update() {
     git -C "$MATRIX_HOME" pull || { msg "$RED" "Failed to pull latest changes."; return 1; }
 
     # Pull latest images from GHCR
-    msg "$CYAN" "Pulling latest base image..."
-    docker pull "${MATRIX_REGISTRY}:base"
+    ensure_base_image || return 1
 
     for rt in "${AVAILABLE_RUNTIMES[@]}"; do
-        msg "$CYAN" "Pulling latest ${rt} runtime..."
-        docker pull "${MATRIX_REGISTRY}:runtime-${rt}" 2>/dev/null || true
+        ensure_runtime_image "$rt" || return 1
     done
 
     # Invalidate local project images so they rebuild on next run
