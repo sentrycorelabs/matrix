@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# In-container runtime manager. Installs language runtimes live inside the
+# running container and persists the choice to /host/.matrix/settings.json
+# so the next `matrix build` bakes them into the project image.
+
+set -euo pipefail
+
+NODE_MAJOR=22
+SETTINGS="/host/.matrix/settings.json"
+ALL_RUNTIMES=(node python php)
+
+usage() {
+    echo "Usage: runtime <command>"
+    echo ""
+    echo "Commands:"
+    echo "  add <node|python|php|all>   Install runtime(s) in this container"
+    echo "  list                        Show installed/available runtimes"
+    echo ""
+    echo "Installs apply to the running container immediately and are saved"
+    echo "to .matrix/settings.json so rebuilds include them."
+}
+
+installed() {
+    case "$1" in
+        node)   command -v node >/dev/null 2>&1 ;;
+        python) command -v python3 >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1 ;;
+        php)    command -v php >/dev/null 2>&1 ;;
+    esac
+}
+
+install_node() {
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+    apt-get install -y nodejs
+}
+
+install_python() {
+    apt-get update
+    apt-get install -y python3 python3-pip python3-venv
+}
+
+install_php() {
+    apt-get update
+    apt-get install -y \
+        php8.5-cli php8.5-common php8.5-mbstring php8.5-xml php8.5-curl \
+        php8.5-zip php8.5-mysql php8.5-pgsql php8.5-sqlite3 php8.5-redis \
+        php8.5-gd php8.5-intl php8.5-bcmath php8.5-tokenizer php8.5-dom
+    if ! command -v composer >/dev/null 2>&1; then
+        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    fi
+}
+
+persist() {
+    local rt="$1"
+    [[ -f "$SETTINGS" ]] || return 0
+    local tmp
+    tmp=$(mktemp)
+    jq --arg rt "$rt" '.runtimes = ((.runtimes // []) + [$rt] | unique)' "$SETTINGS" > "$tmp" \
+        && mv "$tmp" "$SETTINGS" \
+        && echo "[runtime] Saved '$rt' to .matrix/settings.json (rebuilds will include it)"
+}
+
+add_one() {
+    local rt="$1"
+    if installed "$rt"; then
+        echo "[runtime] $rt is already installed."
+        persist "$rt"
+        return 0
+    fi
+    echo "[runtime] Installing $rt..."
+    "install_$rt"
+    rm -rf /var/lib/apt/lists/*
+    persist "$rt"
+    echo "[runtime] $rt installed."
+}
+
+cmd_add() {
+    local target="${1:-}"
+    case "$target" in
+        all)
+            for rt in "${ALL_RUNTIMES[@]}"; do add_one "$rt"; done ;;
+        node|python|php)
+            add_one "$target" ;;
+        *)
+            usage; exit 1 ;;
+    esac
+}
+
+cmd_list() {
+    echo "Runtimes:"
+    for rt in "${ALL_RUNTIMES[@]}"; do
+        if installed "$rt"; then
+            echo "  [x] $rt"
+        else
+            echo "  [ ] $rt   (runtime add $rt)"
+        fi
+    done
+}
+
+case "${1:-}" in
+    add)     shift; cmd_add "${1:-}" ;;
+    list|ls) cmd_list ;;
+    *)       usage ;;
+esac

@@ -4,6 +4,7 @@
 # Only allow what the Dockerfile actually needs
 !config/
 !shims/
+!bin/
 
 # Secrets & credentials 
 .env

@@ -81,18 +81,36 @@ ensure_image() {
         return
     fi
 
-    # Check if local image already exists
-    if docker image inspect "$image_name" &>/dev/null; then
-        echo "$image_name"
-        return
-    fi
-
     # Ensure base and runtime layers are available. Published images are used
     # when accessible; otherwise the local Dockerfiles are the source of truth.
     ensure_base_image || return 1
     for rt in $runtimes_str; do
         ensure_runtime_image "$rt" || return 1
     done
+
+    # Fingerprint of the layer images this composition is built from. Stored
+    # as a label so a stale composed image rebuilds automatically when the
+    # base or a runtime image changes (rmi can fail silently while a
+    # container is running, so absence of the image can't be relied on).
+    # COMPOSE_VERSION: bump when the generated Dockerfile below changes,
+    # so existing composed images rebuild even if layer IDs are unchanged.
+    local COMPOSE_VERSION=2
+    local fingerprint
+    fingerprint="v${COMPOSE_VERSION}:$(docker image inspect -f '{{.Id}}' "${MATRIX_REGISTRY}:base")"
+    for rt in $runtimes_str; do
+        fingerprint="${fingerprint},$(docker image inspect -f '{{.Id}}' "${MATRIX_REGISTRY}:runtime-${rt}")"
+    done
+
+    # Reuse the existing composed image only if its layers are current
+    if docker image inspect "$image_name" &>/dev/null; then
+        local existing_fp
+        existing_fp=$(docker image inspect -f '{{index .Config.Labels "matrix.layers"}}' "$image_name" 2>/dev/null)
+        if [[ "$existing_fp" == "$fingerprint" ]]; then
+            echo "$image_name"
+            return
+        fi
+        msg "$YELLOW" "Base or runtime images changed; rebuilding ${image_name}..."
+    fi
 
     # Generate Dockerfile in memory
     msg "$CYAN" "Building project image (${image_name})..."
@@ -103,8 +121,12 @@ ensure_image() {
 COPY --from=${MATRIX_REGISTRY}:runtime-${rt} / /"
     done
 
+    # Runtime layers clobber /etc/passwd — restore zsh as root's shell
+    dockerfile="${dockerfile}
+RUN chsh -s /usr/bin/zsh root"
+
     # Build from stdin — no build context needed
-    if ! echo "$dockerfile" | docker build -t "$image_name" -f - . >&2; then
+    if ! echo "$dockerfile" | docker build -t "$image_name" --label "matrix.layers=${fingerprint}" -f - . >&2; then
         msg "$RED" "Failed to build project image."
         msg "$RED" "A runtime image may not be published yet. Run: matrix update"
         return 1

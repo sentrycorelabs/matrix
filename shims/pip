@@ -1,4 +1,4 @@
 #!/bin/sh
-echo "[matrix] pip is not available in this container (requires Python)."
-echo "         Add it with: matrix config"
+echo "[matrix] Python is not available in this container."
+echo "         Install it now with: runtime add python"
 exit 127

@@ -3,6 +3,9 @@
 CONTAINER_PREFIX="matrix"
 MATRIX_HOME="$HOME/.matrix"
 
+# Silence Docker Desktop's "What's next: Try Docker Debug" CLI hints
+export DOCKER_CLI_HINTS=false
+
 # ─── Source libraries ────────────────────────────────────────────
 
 source "$MATRIX_HOME/lib/utils.sh"
@@ -20,31 +23,46 @@ done
 # ─── Usage ───────────────────────────────────────────────────────
 
 usage() {
-    echo "Usage: matrix [command] [options]"
-    echo ""
-    echo "Commands:"
-    echo "  (none)       Enter the Matrix in the current directory"
-    echo "  build        Build/rebuild the project image"
-    echo "  stop [name]  Stop a running container (default: current dir)"
-    echo "  list         List running Matrix containers"
-    echo "  destroy      Remove all Matrix images"
-    echo "  config       Re-run setup for the current directory"
-    echo "  update       Pull latest images and CLI"
-    echo ""
-    echo "Options:"
-    echo "  -p PORTS     Expose ports, comma-separated (default: random)"
-    echo "  -n NAME      Custom container name"
+    printf "\n"
+    printf "  ${GREEN}${BOLD}Matrix${NC} — a portable, containerized dev environment\n"
+    printf "\n"
+    printf "  ${BOLD}Usage:${NC} matrix ${CYAN}<command>${NC} ${YELLOW}[options]${NC}\n"
+    printf "\n"
+    printf "  ${BOLD}Commands:${NC}\n"
+    printf "    ${CYAN}%-12s${NC} %s\n" "start"   "Enter the Matrix in the current directory"
+    printf "    ${CYAN}%-12s${NC} %s\n" "build"   "Build/rebuild the project image"
+    printf "    ${CYAN}%-12s${NC} %s\n" "stop"    "Stop a running container (default: current dir)"
+    printf "    ${CYAN}%-12s${NC} %s\n" "list"    "List running Matrix containers"
+    printf "    ${CYAN}%-12s${NC} %s\n" "destroy" "Remove all Matrix images"
+    printf "    ${CYAN}%-12s${NC} %s\n" "config"  "Re-run setup for the current directory"
+    printf "    ${CYAN}%-12s${NC} %s\n" "update"  "Pull latest images and CLI"
+    printf "    ${CYAN}%-12s${NC} %s\n" "help"    "Show this message"
+    printf "\n"
+    printf "  ${BOLD}Options (for start):${NC}\n"
+    printf "    ${YELLOW}%-12s${NC} %s\n" "-p PORTS" "Expose ports, comma-separated (default: random)"
+    printf "    ${YELLOW}%-12s${NC} %s\n" "-n NAME"  "Custom container name"
+    printf "\n"
+    printf "  ${BOLD}Examples:${NC}\n"
+    printf "    matrix start                ${BLUE}# enter (or reconnect to) this project${NC}\n"
+    printf "    matrix start -p 3000,5173   ${BLUE}# expose dev server ports${NC}\n"
+    printf "    matrix stop api-project     ${BLUE}# stop a named container${NC}\n"
+    printf "\n"
 }
 
 # ─── Dispatch ────────────────────────────────────────────────────
 
 case "${1:-}" in
+    start)   shift; cmd_enter "$@" ;;
     build)   cmd_build ;;
     stop)    cmd_stop "$2" ;;
     list)    cmd_list ;;
     destroy) cmd_destroy ;;
     config)  run_setup ;;
     update)  cmd_update ;;
-    help|-h) usage ;;
-    *)       cmd_enter "$@" ;;
+    ""|help|-h|--help) usage ;;
+    *)
+        msg "$RED" "Unknown command: $1"
+        usage
+        exit 1
+        ;;
 esac

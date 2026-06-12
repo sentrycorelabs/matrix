@@ -1,4 +1,4 @@
 #!/bin/sh
 echo "[matrix] PHP is not available in this container."
-echo "         Add it with: matrix config"
+echo "         Install it now with: runtime add php"
 exit 127

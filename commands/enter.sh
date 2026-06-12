@@ -53,6 +53,15 @@ cmd_enter() {
         docker run "${run_args[@]}" "$image_name" > /dev/null
     else
         msg "$GREEN" "Reconnecting to ${container_name}..."
+
+        # Warn if the running container was created from an older image
+        local running_image current_image
+        running_image=$(docker inspect -f '{{.Image}}' "$container_name" 2>/dev/null)
+        current_image=$(docker image inspect -f '{{.Id}}' "$image_name" 2>/dev/null)
+        if [[ -n "$running_image" && -n "$current_image" && "$running_image" != "$current_image" ]]; then
+            msg "$YELLOW" "This container is from an older image. Run 'matrix stop && matrix start' to refresh."
+            sleep 2
+        fi
     fi
 
     # Attach to shared tmux session (create if first connection)

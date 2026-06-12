@@ -29,33 +29,44 @@ This clones the repo to `~/.matrix/` and symlinks the CLI to `/usr/local/bin/mat
 
 **AI**
 - Claude Code (with optional OAuth passthrough from macOS Keychain)
+- Codex CLI (with optional `~/.codex` auth passthrough)
 
 **Docker**
 - Docker CLI + Compose plugin (talks to the host daemon via socket mount)
 
 **Language Runtimes (auto-detected)**
-- Node.js 20 — detected from `package.json`, `yarn.lock`, `pnpm-lock.yaml`, `.nvmrc`
+- Node.js 22 — detected from `package.json`, `yarn.lock`, `pnpm-lock.yaml`, `.nvmrc`
 - Python 3 — detected from `requirements.txt`, `pyproject.toml`, `setup.py`, `Pipfile`, `.python-version`
 - PHP 8.5 + Composer — detected from `composer.json`, `artisan`
 
-Only the runtimes your project needs are installed. No project files? You get the base environment.
+All images are based on Ubuntu 26.04 LTS.
+
+Only the runtimes your project needs are installed. No project files? You get the base environment. Need a runtime later? Install it from inside the container:
+
+```bash
+runtime add node      # or python, php
+runtime add all       # everything
+runtime list          # see what's installed
+```
+
+Installs take effect immediately in the running container and are saved to `.matrix/settings.json`, so the next image rebuild includes them.
 
 ## Usage
 
 ```
-matrix [command] [options]
+matrix <command> [options]
 
 Commands:
-  (none)       Enter the Matrix in the current directory
+  start        Enter the Matrix in the current directory
   build        Rebuild the project image
   stop [name]  Stop a running container (default: current dir)
   list         List running Matrix containers
   destroy      Remove all Matrix images
   config       Re-run setup for the current directory
   update       Pull latest images and CLI
-  help         Show usage info
+  help         Show usage info (also shown when run with no command)
 
-Options:
+Options (for start):
   -p PORTS     Expose ports, comma-separated (default: random)
   -n NAME      Custom container name
 ```
@@ -64,19 +75,19 @@ Options:
 
 ```bash
 # Enter the Matrix in your current project directory
-matrix
+matrix start
 
 # Enter with a custom port
-matrix -p 3000
+matrix start -p 3000
 
 # Enter with multiple ports
-matrix -p 3000,5173,8080
+matrix start -p 3000,5173,8080
 
 # Enter with a custom container name
-matrix -n api-project
+matrix start -n api-project
 
-# Reconnect to a running container (automatic — just run matrix again)
-matrix
+# Reconnect to a running container (automatic — just run matrix start again)
+matrix start
 
 # List all active containers
 matrix list
@@ -96,7 +107,7 @@ matrix destroy
 
 ## Per-Project Settings
 
-The first time you run `matrix` in a directory, it auto-detects your project and runs setup:
+The first time you run `matrix start` in a directory, it auto-detects your project and runs setup:
 
 ```
 [matrix] First-time setup for this project
@@ -105,6 +116,7 @@ The first time you run `matrix` in a directory, it auto-detects your project and
   Override detected runtimes? (available: node python php) [n]:
   Map ~/.ssh into container? [y/N]
   Pass Claude Code auth into container? [y/N]
+  Pass Codex auth into container? [y/N]
   Ports to expose (comma-separated) [52431]:
   Add .matrix to .gitignore? [Y/n]
 
@@ -115,17 +127,22 @@ Settings are saved to `.matrix/settings.json` in your project directory. Run `ma
 
 ## How It Works
 
-Running `matrix` in any project directory:
+Running `matrix start` in any project directory:
 
 1. Reads per-project settings from `.matrix/settings.json` (or runs first-time setup)
 2. Auto-detects language runtimes from project files
 3. Builds a project-specific image by composing pre-built runtime layers (cached after first build)
-4. Mounts your current directory into the container at `/app`
+4. Mounts your current directory into the container at `/host`
 5. Forwards the host Docker socket so you can run Docker commands inside
 6. Optionally mounts `~/.ssh` (read-only) for git operations
-7. Optionally passes Claude Code credentials through
+7. Optionally passes Claude Code and Codex credentials through
 8. Exposes ports for dev servers
 9. Names the container after your project — re-running reconnects to it
+
+### AI auth passthrough
+
+- **Claude Code:** credentials are read from the macOS Keychain (or `~/.claude/.credentials.json` on Linux) and injected as `CLAUDE_CODE_OAUTH_TOKEN`; `~/.claude` and `~/.claude.json` are mounted read-only.
+- **Codex:** `~/.codex` (which holds `auth.json` and config) is mounted read-write so token refreshes inside the container persist. Run `codex login` on the host first.
 
 ## Project Structure
 
@@ -134,9 +151,11 @@ Running `matrix` in any project directory:
 ├── matrix                      # CLI entrypoint
 ├── install.sh                  # Curl installer
 ├── Dockerfile.base             # Base image (tools, editor, no runtimes)
-├── Dockerfile.runtime-node     # Node 20 runtime image
+├── Dockerfile.runtime-node     # Node 22 runtime image
 ├── Dockerfile.runtime-python   # Python 3 runtime image
 ├── Dockerfile.runtime-php      # PHP 8.5 + Composer runtime image
+├── bin/
+│   └── runtime                 # In-container runtime installer
 ├── shims/                      # Shim scripts for missing runtime commands
 ├── lib/
 │   ├── utils.sh                # Colors, messaging, helpers

@@ -1,3 +1,15 @@
+# ─── Welcome message (every new shell, like an MOTD) ─────────────
+# Must run before the p10k instant prompt — output after it triggers warnings.
+echo ""
+echo "\033[1;36m  Welcome to the Matrix\033[0m"
+echo ""
+echo "  Your project is mounted at \033[1m/host\033[0m"
+echo "  AI assistants:       \033[1mclaude\033[0m or \033[1mcodex\033[0m"
+echo "  Add runtimes:        \033[1mruntime add node|python|php|all\033[0m  (\033[1mruntime list\033[0m to check)"
+echo "  Detach (keep alive): \033[1mCtrl-a d\033[0m — \033[1mmatrix start\033[0m on the host to reconnect"
+echo "  From the host:       \033[1mmatrix list\033[0m | \033[1mmatrix stop\033[0m | \033[1mmatrix help\033[0m"
+echo ""
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"

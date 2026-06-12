@@ -23,6 +23,7 @@ load_settings() {
     if [[ -f "$settings_file" ]]; then
         MATRIX_SSH=$(jq -r '.ssh // false' "$settings_file")
         MATRIX_CLAUDE_AUTH=$(jq -r '.claude_auth // false' "$settings_file")
+        MATRIX_CODEX_AUTH=$(jq -r '.codex_auth // false' "$settings_file")
         MATRIX_PORTS=$(jq -r '.ports // empty' "$settings_file" 2>/dev/null)
         if [[ -z "$MATRIX_PORTS" ]]; then
             # Backwards compat: old settings used "port" (singular)
@@ -49,9 +50,10 @@ save_settings() {
     jq -n \
         --argjson ssh "$MATRIX_SSH" \
         --argjson claude_auth "$MATRIX_CLAUDE_AUTH" \
+        --argjson codex_auth "${MATRIX_CODEX_AUTH:-false}" \
         --arg ports "$MATRIX_PORTS" \
         --argjson runtimes "$runtimes_json" \
-        '{ssh: $ssh, claude_auth: $claude_auth, ports: $ports, runtimes: $runtimes}' \
+        '{ssh: $ssh, claude_auth: $claude_auth, codex_auth: $codex_auth, ports: $ports, runtimes: $runtimes}' \
         > .matrix/settings.json
 }
 
@@ -91,6 +93,13 @@ run_setup() {
     case "$ans" in
         [yY]*) MATRIX_CLAUDE_AUTH=true ;;
         *)     MATRIX_CLAUDE_AUTH=false ;;
+    esac
+
+    printf "  Pass Codex auth into container? [y/N] "
+    read -r ans
+    case "$ans" in
+        [yY]*) MATRIX_CODEX_AUTH=true ;;
+        *)     MATRIX_CODEX_AUTH=false ;;
     esac
 
     local default_port

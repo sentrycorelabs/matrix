@@ -68,7 +68,7 @@ msg "$GREEN" "Symlinked matrix to $BIN_LINK"
 
 msg "$GREEN" "Matrix installed successfully!"
 echo ""
-echo "  Run 'matrix' in any project directory to get started."
+echo "  Run 'matrix start' in any project directory to get started."
 echo "  Run 'matrix help' for all commands."
 echo ""
 echo "  Images are pulled automatically on first run — no build needed."

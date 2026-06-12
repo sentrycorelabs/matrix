@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     tmux \
     neovim \
     bat \
+    bubblewrap \
+    socat \
     git \
     curl \
     wget \
@@ -22,7 +24,6 @@ RUN apt-get update && apt-get install -y \
     g++ \
     ca-certificates \
     gnupg \
-    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 # bat is installed as batcat on Ubuntu — symlink it
@@ -41,8 +42,21 @@ RUN install -m 0755 -d /etc/apt/keyrings \
 RUN curl -fsSL https://claude.ai/install.sh | bash
 ENV PATH="$PATH:/root/.local/bin"
 
+# ─── Codex CLI (standalone binary, no Node required) ────────────
+RUN arch=$(dpkg --print-architecture) \
+    && case "$arch" in \
+         amd64) triple="x86_64-unknown-linux-musl" ;; \
+         arm64) triple="aarch64-unknown-linux-musl" ;; \
+         *) echo "Unsupported arch: $arch" && exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/openai/codex/releases/latest/download/codex-${triple}.tar.gz" \
+       | tar -xz -C /usr/local/bin \
+    && mv "/usr/local/bin/codex-${triple}" /usr/local/bin/codex \
+    && chmod +x /usr/local/bin/codex
+
 # ─── Set zsh as default shell ─────────────────────────────────────
 RUN chsh -s /usr/bin/zsh root
+ENV SHELL=/usr/bin/zsh
 
 # ─── Oh My Zsh + Powerlevel10k + plugins ─────────────────────────
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \
@@ -66,9 +80,11 @@ COPY config/tmux.conf /root/.tmux.conf
 # ─── Dotfiles: nvim ──────────────────────────────────────────────
 COPY config/nvim/ /root/.config/nvim/
 
-# ─── Runtime shims ───────────────────────────────────────────────
+# ─── Runtime shims + in-container runtime installer ──────────────
 COPY shims/ /opt/matrix/shims/
 RUN chmod +x /opt/matrix/shims/*
+COPY bin/runtime /usr/local/bin/runtime
+RUN chmod +x /usr/local/bin/runtime
 
 # ─── Install tmux plugins ────────────────────────────────────────
 RUN ~/.tmux/plugins/tpm/bin/install_plugins || true
@@ -77,6 +93,6 @@ RUN ~/.tmux/plugins/tpm/bin/install_plugins || true
 RUN nvim --headless "+Lazy! sync" +qa 2>/dev/null || true
 
 # ─── Workspace ────────────────────────────────────────────────────
-WORKDIR /app
+WORKDIR /host
 
 ENTRYPOINT ["sleep", "infinity"]

@@ -1,17 +1,11 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+# PHP 8.5 ships in the native Ubuntu 26.04 archive — no PPA needed
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
-    gnupg \
-    software-properties-common \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN add-apt-repository ppa:ondrej/php -y \
-    && apt-get update \
-    && apt-get install -y \
     php8.5-cli \
     php8.5-common \
     php8.5-mbstring \

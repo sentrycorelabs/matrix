@@ -2,7 +2,7 @@
 
 cmd_build() {
     if ! load_settings; then
-        msg "$YELLOW" "No settings found. Run 'matrix' first to set up this project."
+        msg "$YELLOW" "No settings found. Run 'matrix start' first to set up this project."
         return 1
     fi
 
